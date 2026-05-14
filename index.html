@@ -71,23 +71,31 @@
     const largeImg = document.getElementById('large-img');
     const bookWrapper = document.getElementById('book-wrapper');
 
+
     function initFlipBook(startPage = 0) {
-        const el = document.getElementById('my-album');
-        if (typeof St !== 'undefined' && el) {
-            // 如果已有實體先銷毀 (某些版本支援 destroy)
+    	const el = document.getElementById('my-album');
+    	if (typeof St !== 'undefined' && el) {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} }
 
             flipBook = new St.PageFlip(el, {
-                width: 600, height: 800, size: "fixed", 
-                showCover: true, drawShadow: true, 
-                clickEventForward: false,
-                useMouseEvents: true // 這是關鍵，關閉大圖時才設為 true
+            	width: 600, 
+            	height: 800, 
+            	size: "stretch",      // 1. 改為 stretch，讓寬度能自動伸縮
+            	minWidth: 300,        // 2. 設定手機版的最小寬度限制
+            	minHeight: 400,
+            	maxWidth: 1000,
+            	maxHeight: 1333,
+            	showCover: true, 
+            	drawShadow: true, 
+            	usePortrait: true,    // 3. 關鍵！寬度不足時自動變為單頁顯示
+            	clickEventForward: false,
+            	useMouseEvents: true 
             });
+        
             flipBook.loadFromHTML(document.querySelectorAll('.page'));
-            
-            // 重新跳轉到之前的頁面
+        
             setTimeout(() => {
-                flipBook.turnToPage(startPage);
+            	flipBook.turnToPage(startPage);
             }, 100);
         }
     }
