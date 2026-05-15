@@ -83,21 +83,20 @@
 
         const isMobile = window.innerWidth < 768;
 
-        flipBook = new St.PageFlip(el, {
-            width: 600, 
-            // 這裡把高度調低到 400，這會迫使套件在橫向和直向都去撐滿寬度
-            height: isMobile ? 400 : 800, 
-            size: "stretch",             
-            minWidth: 200,
-            minHeight: 150,
-            maxWidth: 2500,
-            maxHeight: 2500,
-            showCover: false, 
-            usePortrait: true, // 強制單頁模式
-            clickEventForward: false,
-            useMouseEvents: true,
-            swipeDistance: 30, // 增加滑動靈敏度
-        });
+flipBook = new St.PageFlip(el, {
+    width: 600, 
+    height: 400, // 故意設得很矮，強迫它在手機上把寬度撐到爆滿
+    size: "stretch",             
+    minWidth: 200,
+    minHeight: 100,
+    maxWidth: 2000,
+    maxHeight: 2000,
+    showCover: false, 
+    usePortrait: true, // 絕對要單頁
+    clickEventForward: false,
+    useMouseEvents: true,
+    mobileScrollSupport: false // 關閉套件的手機捲動，改用我們的 CSS 控制
+});
 
         const pages = document.querySelectorAll('.page');
         if(pages.length > 0) { flipBook.loadFromHTML(pages); }
