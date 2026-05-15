@@ -34,10 +34,11 @@ body {
         padding: 0 !important; 
     }
     #book-wrapper { 
-        height: 100vh !important; 
+        height: 100% !important; 
         width: 100vw !important; /* 強制寬度貼齊手機邊緣 */
         max-width: 100vw !important;
         margin: 0 !important; 
+        top: 0 !important;
     }
     #my-album {
         margin: 0 !important;
