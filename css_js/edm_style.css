@@ -37,14 +37,22 @@ body {
         height: 100vh !important; /* 直向時佔滿全高 */
         max-width: 100vw !important;
         margin: 0 !important;
-        display: flex;
-        align-items: center;
+        left: 0 !important;
+        top: 0 !important;
+        position: fixed !important; /* 強制置頂 */
     }
     /* 轉向橫向時的特殊處理 */
     @media (orientation: landscape) {
         #book-wrapper {
             height: 100vh !important; 
         }
+        .page img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important; /* 這是字體變大的關鍵，會犧牲一點點上下邊緣來換取寬度 */
+    }
+        /* 隱藏黃頁可能產生的捲軸 */
+        html, body { overflow: hidden; }
     }
 }
 /* 這裡是原本最後的部分，確保括號都有對稱 */
