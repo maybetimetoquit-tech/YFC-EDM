@@ -77,38 +77,44 @@
 
     // 2. 初始化翻頁書函式
     function initFlipBook(startPage = 0) {
-        const el = document.getElementById('my-album');
-        if (typeof St !== 'undefined' && el && el.children.length > 0) {
-            if (flipBook) { 
-                try { flipBook.destroy(); } catch(e) { console.warn(e); } 
-            }
-
-            flipBook = new St.PageFlip(el, {
-                width: 600, 
-                height: 800, 
-                size: "stretch",             
-                minWidth: 200,
-                minHeight: 250,
-                maxWidth: 2000,
-                maxHeight: 2000,
-                showCover: false,   // 改為 false，避免封面特殊處理
-                drawShadow: true, 
-                usePortrait: true,  // ★最關鍵：強制開啟單頁（縱向）模式
-                autoSize: true,     // 自動調整大小
-                clickEventForward: false,
-                useMouseEvents: true 
-            });
-
-            const pages = document.querySelectorAll('.page');
-            if(pages.length > 0) {
-                flipBook.loadFromHTML(pages);
-            }
-            
-            setTimeout(() => {
-                if(flipBook) flipBook.turnToPage(startPage);
-            }, 200);
+    const el = document.getElementById('my-album');
+    if (typeof St !== 'undefined' && el && el.children.length > 0) {
+        if (flipBook) { 
+            try { flipBook.destroy(); } catch(e) { console.warn(e); } 
         }
+
+        const isMobile = window.innerWidth < 768;
+
+        flipBook = new St.PageFlip(el, {
+            // 電腦版維持 600x800，手機版改為 600x600 (或更矮) 讓它橫向撐滿
+            width: 600, 
+            height: isMobile ? 600 : 800, 
+            
+            size: "stretch",             
+            minWidth: 200,
+            minHeight: 200, 
+            maxWidth: 2000,
+            maxHeight: 2000,
+            showCover: false, 
+            drawShadow: true, 
+            
+            // 強制開啟單頁模式，這是手機版變大的唯一關鍵
+            usePortrait: true,           
+            
+            clickEventForward: false,
+            useMouseEvents: true 
+        });
+
+        const pages = document.querySelectorAll('.page');
+        if(pages.length > 0) {
+            flipBook.loadFromHTML(pages);
+        }
+        
+        setTimeout(() => {
+            if(flipBook) flipBook.turnToPage(startPage);
+        }, 200);
     }
+}
 
     // 3. 網頁載入完成後的動作
     window.onload = () => {
