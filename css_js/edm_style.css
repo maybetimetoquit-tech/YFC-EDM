@@ -28,18 +28,19 @@ body {
     cursor: zoom-in;
 }
 
-/* 針對手機版的終極放大設定 */
 @media (max-width: 767.98px) {
-    body { background: #ffffff; } /* 改白色背景減少邊框感 */
+    body { 
+        background: #ffffff; 
+        padding: 0 !important; 
+    }
     #book-wrapper { 
         height: 100vh !important; 
-        width: 100vw !important; 
+        width: 100vw !important; /* 強制寬度貼齊手機邊緣 */
+        max-width: 100vw !important;
+        margin: 0 !important; 
     }
-    .overlay-hint {
-        top: 15px !important;  
-        padding: 5px 12px;     
-        font-size: 12px;      
-        background: rgba(0, 0, 0, 0.5);
+    #my-album {
+        margin: 0 !important;
     }
 }
 
