@@ -79,42 +79,39 @@
     function initFlipBook(startPage = 0) {
     const el = document.getElementById('my-album');
     if (typeof St !== 'undefined' && el && el.children.length > 0) {
-        if (flipBook) { 
-            try { flipBook.destroy(); } catch(e) { console.warn(e); } 
-        }
+        if (flipBook) { flipBook.destroy(); }
 
         const isMobile = window.innerWidth < 768;
 
         flipBook = new St.PageFlip(el, {
-            // 電腦版維持 600x800，手機版改為 600x600 (或更矮) 讓它橫向撐滿
             width: 600, 
-            height: isMobile ? 600 : 800, 
-            
+            // 這裡把高度調低到 400，這會迫使套件在橫向和直向都去撐滿寬度
+            height: isMobile ? 400 : 800, 
             size: "stretch",             
             minWidth: 200,
-            minHeight: 200, 
-            maxWidth: 2000,
-            maxHeight: 2000,
+            minHeight: 150,
+            maxWidth: 2500,
+            maxHeight: 2500,
             showCover: false, 
-            drawShadow: true, 
-            
-            // 強制開啟單頁模式，這是手機版變大的唯一關鍵
-            usePortrait: true,           
-            
+            usePortrait: true, // 強制單頁模式
             clickEventForward: false,
-            useMouseEvents: true 
+            useMouseEvents: true,
+            swipeDistance: 30, // 增加滑動靈敏度
         });
 
         const pages = document.querySelectorAll('.page');
-        if(pages.length > 0) {
-            flipBook.loadFromHTML(pages);
-        }
+        if(pages.length > 0) { flipBook.loadFromHTML(pages); }
         
         setTimeout(() => {
             if(flipBook) flipBook.turnToPage(startPage);
         }, 200);
     }
 }
+
+    // 監測手機轉向，轉向時自動重新計算
+    window.addEventListener('resize', () => {
+    	initFlipBook(flipBook ? flipBook.getCurrentPageIndex() : 0);
+    });
 
     // 3. 網頁載入完成後的動作
     window.onload = () => {
