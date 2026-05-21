@@ -249,6 +249,14 @@
                     page.appendChild(img);
                     album.appendChild(page);
                 }
+                // 第一張就初始化，後續追加
+                if (i === 1) {
+                    loadingMsg.style.display = 'none';
+                    initMobileBook();
+                } else if (mobileBook) {
+                    mobileBook.updateFromHtml(document.querySelectorAll('#mobile-album .page'));
+                    mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
+                }
             } else {
                 const album = document.getElementById('my-album');
                 if (!album) break;
@@ -271,8 +279,8 @@
 
         loadingMsg.style.display = 'none';
 
-        if (isMobile) {
-            initMobileBook();
+        if (isMobile && mobileBook) {
+            mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
         }
     }
 
