@@ -120,7 +120,7 @@
 </div>
 
 <script>
-    const isMobile = window.innerWidth < 768;
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
     let currentCategory = 'A';
     let flipBook = null;
