@@ -74,7 +74,7 @@
             pointer-events: none;
         }
 
-        /* 手機版 swiper */
+        /* 手機版 PageFlip 單頁 */
         #mobile-view {
             display: none;
             position: fixed;
@@ -84,27 +84,14 @@
             overflow: hidden;
             background: #fff;
         }
-        #mobile-strip {
-            display: flex;
-            height: 100%;
-            transition: transform 0.3s ease;
-            will-change: transform;
+        #mobile-album .page {
+            background: #fff !important;
+            overflow: hidden;
         }
-        #mobile-strip .m-page {
-            min-width: 100vw;
-            width: 100vw;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #fff;
-        }
-        #mobile-strip .m-page img {
-            max-width: 100%;
-            max-height: 100%;
+        #mobile-album .page img {
+            width: 100%; height: 100%;
             object-fit: contain;
-            user-select: none;
-            -webkit-user-drag: none;
+            pointer-events: none;
         }
         #mobile-counter {
             position: fixed;
@@ -156,9 +143,9 @@
     <div id="my-album"></div>
 </div>
 
-<!-- 手機版 swiper -->
+<!-- 手機版 PageFlip -->
 <div id="mobile-view">
-    <div id="mobile-strip"></div>
+    <div id="mobile-album"></div>
 </div>
 <div id="mobile-counter" style="display:none"></div>
 
@@ -179,45 +166,56 @@
     const bookWrapper = document.getElementById('book-wrapper');
     const loadingMsg = document.getElementById('loading-msg');
 
-    // ── 手機版 swiper ──────────────────────────────
+    // ── 手機版 PageFlip 單頁 ──────────────────────
     let mobileImages = [];
     let mobileIndex = 0;
+    let mobileBook = null;
     const mobileView = document.getElementById('mobile-view');
-    const mobileStrip = document.getElementById('mobile-strip');
     const mobileCounter = document.getElementById('mobile-counter');
 
     function mobileRender() {
-        mobileStrip.style.transition = 'none';
-        mobileStrip.innerHTML = '';
+        const album = document.getElementById('mobile-album');
+        if (!album) return;
+        album.innerHTML = '';
         mobileImages.forEach(src => {
             const div = document.createElement('div');
-            div.className = 'm-page';
+            div.className = 'page';
             const img = document.createElement('img');
             img.src = src;
             div.appendChild(img);
-            mobileStrip.appendChild(div);
+            album.appendChild(div);
         });
-        mobileGoTo(mobileIndex, false);
-        mobileCounter.style.display = mobileImages.length ? 'block' : 'none';
-    }
 
-    function mobileGoTo(index, animate = true) {
-        mobileIndex = Math.max(0, Math.min(index, mobileImages.length - 1));
-        mobileStrip.style.transition = animate ? 'transform 0.3s ease' : 'none';
-        mobileStrip.style.transform = `translateX(-${mobileIndex * 100}vw)`;
-        mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
-    }
+        if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
 
-    // 觸控滑動
-    let touchStartX = 0;
-    mobileView.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
-    mobileView.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        if (Math.abs(dx) > 40) {
-            if (dx < 0) mobileGoTo(mobileIndex + 1);
-            else mobileGoTo(mobileIndex - 1);
+        if (typeof St !== 'undefined' && album.children.length > 0) {
+            const w = window.innerWidth;
+            const h = window.innerHeight - 46;
+
+            mobileBook = new St.PageFlip(album, {
+                width: w,
+                height: h,
+                size: "fixed",
+                showCover: false,
+                usePortrait: true,
+                drawShadow: true,
+                clickEventForward: false,
+                useMouseEvents: false,
+                swipeDistance: 20,
+                flippingTime: 600,
+            });
+
+            mobileBook.loadFromHTML(document.querySelectorAll('#mobile-album .page'));
+
+            mobileBook.on('flip', (e) => {
+                mobileIndex = e.data;
+                mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
+            });
         }
-    }, { passive: true });
+
+        mobileCounter.style.display = mobileImages.length ? 'block' : 'none';
+        mobileCounter.textContent = `1 / ${mobileImages.length}`;
+    }
 
     // ── 共用：圖片偵測與載入 ───────────────────────
     async function buildPages(category) {
@@ -248,20 +246,6 @@
 
             if (isMobile) {
                 mobileImages.push(full);
-                // 第一張載入就顯示
-                if (i === 1) {
-                    loadingMsg.style.display = 'none';
-                    mobileRender();
-                } else {
-                    // 新增一頁到 strip
-                    const div = document.createElement('div');
-                    div.className = 'm-page';
-                    const img = document.createElement('img');
-                    img.src = full;
-                    div.appendChild(img);
-                    mobileStrip.appendChild(div);
-                    mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
-                }
             } else {
                 const album = document.getElementById('my-album');
                 if (!album) break;
@@ -282,7 +266,12 @@
             i++;
         }
 
-        loadingMsg.style.display = 'none';
+        if (isMobile) {
+            loadingMsg.style.display = 'none';
+            mobileRender();
+        } else {
+            loadingMsg.style.display = 'none';
+        }
     }
 
     async function switchCategory(category) {
@@ -293,7 +282,11 @@
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        if (!isMobile) {
+        if (isMobile) {
+            if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
+            mobileImages = [];
+            mobileIndex = 0;
+        } else {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
             const bw = document.getElementById('book-wrapper');
             const oldAlbum = document.getElementById('my-album');
