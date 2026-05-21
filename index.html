@@ -281,6 +281,30 @@
     };
 
     window.onmouseup = () => isDragging = false;
+
+    // 單指翻頁，雙指縮放分離處理
+    let isPinching = false;
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length >= 2) {
+            isPinching = true;
+            // 雙指時停止 PageFlip 的觸控
+            if (flipBook) flipBook.getPageFlip().stopDrag();
+        } else {
+            isPinching = false;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (isPinching) {
+            // 雙指時讓瀏覽器原生縮放接管，不阻止事件
+            return;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) isPinching = false;
+    }, { passive: true });
 </script>
 </body>
 </html>
