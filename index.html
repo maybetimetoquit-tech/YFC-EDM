@@ -38,10 +38,9 @@
         }
         #loading-msg {
             position: fixed;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 15px;
-            color: #666;
+            top: 55px; left: 12px;
+            font-size: 13px;
+            color: #888;
             font-family: sans-serif;
             z-index: 998;
         }
@@ -62,7 +61,7 @@
     <button onclick="switchCategory('E')">Drag Chain Cable</button>
 </div>
 
-<div id="loading-msg">載入中…</div>
+<div id="loading-msg">Loading...</div>
 
 <div class="overlay-hint" id="overlay-hint">
     <span>滑鼠滾輪：縮放照片 │ 按住左鍵：拖拽移動 │ 點擊空白處：關閉</span>
@@ -95,13 +94,16 @@
     const bookWrapper = document.getElementById('book-wrapper');
     const loadingMsg = document.getElementById('loading-msg');
 
-    // 自動偵測圖片是否存在，不需要寫死張數
+    // 自動偵測圖片是否存在，邊載入邊更新翻頁書
     async function buildPages(category) {
         const album = document.getElementById('my-album');
+        if (!album) return;
         album.innerHTML = '';
         loadingMsg.style.display = 'block';
 
         let i = 1;
+        let initialized = false;
+
         while (true) {
             const num = String(i).padStart(2, '0');
             const thumb = `images/thumbs/${category}/${category}${num}.jpg?v=1`;
@@ -113,7 +115,21 @@
 
             if (!exists) break;
 
-            album.innerHTML += `<div class="page"><img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)"></div>`;
+            const page = document.createElement('div');
+            page.className = 'page';
+            page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
+            album.appendChild(page);
+
+            // 第一張載入完就先初始化翻頁書，讓使用者可以開始翻頁
+            if (!initialized) {
+                loadingMsg.style.display = 'none';
+                initFlipBook(0);
+                initialized = true;
+            } else if (flipBook) {
+                // 後續每張載入完就更新翻頁書
+                flipBook.updateFromHtml(document.querySelectorAll('.page'));
+            }
+
             i++;
         }
 
@@ -129,18 +145,19 @@
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        // 銷毀舊 flipBook，重建 #my-album（destroy 會動到 DOM）
+        // 先把 flipBook 停掉，但不 destroy（避免 DOM 被動到）
         if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
-        const bw = document.getElementById("book-wrapper");
-        let album = document.getElementById("my-album");
-        if (!album) {
-            album = document.createElement("div");
-            album.id = "my-album";
-            bw.appendChild(album);
-        }
+
+        // 把 #my-album 整個換掉，確保 PageFlip 拿到乾淨的 DOM
+        const bw = document.getElementById('book-wrapper');
+        const oldAlbum = document.getElementById('my-album');
+        if (oldAlbum) bw.removeChild(oldAlbum);
+        const newAlbum = document.createElement('div');
+        newAlbum.id = 'my-album';
+        bw.appendChild(newAlbum);
+
         lastPageIndex = 0;
         await buildPages(category);
-        initFlipBook(0);
     }
 
     function initFlipBook(startPage = 0) {
@@ -185,7 +202,6 @@
 
     window.onload = async () => {
         await buildPages(currentCategory);
-        initFlipBook(0);
 
         const prevBtn = document.getElementById('click-prev');
         const nextBtn = document.getElementById('click-next');
