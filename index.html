@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>EDM</title>
     <meta name="author" content="Donny Chen" />
     <script src="https://maybetimetoquit-tech.github.io/YFC-EDM/css_js/page-flip.browser.min.js"></script>
@@ -34,6 +34,9 @@
             color: #fff;
             border-color: #333;
         }
+        #book-wrapper {
+            margin-top: 50px;
+        }
         #loading-msg {
             position: fixed;
             top: 55px; left: 12px;
@@ -41,83 +44,11 @@
             color: #888;
             font-family: sans-serif;
             z-index: 998;
-            display: none;
         }
-
-        /* 電腦版 */
-        #book-wrapper { margin-top: 50px; }
-        #image-overlay {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.98); z-index: 1000000; overflow: auto;
-        }
-        #image-container {
-            display: block; text-align: center; width: 100%; padding: 100px 0;
-            min-height: 100vh; cursor: grab;
-        }
-        #large-img {
-            width: 85%; height: auto; display: inline-block;
-            box-shadow: 0 5px 30px rgba(0,0,0,0.15);
-            transition: width 0.05s linear;
-        }
-        .overlay-hint {
-            display: none;
-            position: fixed;
-            top: 20px; left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.6);
-            color: #fff;
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-size: 13px;
-            z-index: 2000000;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-
-        /* 手機版 PageFlip - 只用右頁 */
-        #mobile-view {
-            display: none;
-            position: fixed;
-            top: 46px; left: 0;
-            width: 100vw;
-            height: calc(100vh - 46px);
-            background: #fff;
-            overflow: hidden;
-        }
-        #mobile-album { width: 100%; height: 100%; }
-        #mobile-album .page {
-            background: #fff !important;
-            overflow: hidden;
-        }
-        #mobile-album .page img {
-            width: 100%; height: 100%;
-            object-fit: contain;
-            pointer-events: none;
-            user-select: none;
-        }
-        /* 左頁空白頁不需要顯示內容 */
-        #mobile-album .page.blank {
-            background: #fff !important;
-        }
-        #mobile-counter {
-            position: fixed;
-            bottom: 12px; left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.45);
-            color: #fff;
-            font-size: 12px;
-            padding: 4px 12px;
-            border-radius: 12px;
-            z-index: 1000;
-            font-family: sans-serif;
-            display: none;
-        }
-
         @media (max-width: 767.98px) {
-            #book-wrapper, #image-overlay, .overlay-hint { display: none !important; }
-            #mobile-view { display: block; }
             #tab-bar { gap: 4px; padding: 6px 6px; }
             #tab-bar button { padding: 5px 10px; font-size: 12px; }
+            #book-wrapper { margin-top: 46px; }
         }
     </style>
 </head>
@@ -136,33 +67,22 @@
 <div class="overlay-hint" id="overlay-hint">
     <span>滑鼠滾輪：縮放照片 │ 按住左鍵：拖拽移動 │ 點擊空白處：關閉</span>
 </div>
+
 <div id="image-overlay">
     <div id="image-container">
         <img id="large-img" src="">
     </div>
 </div>
 
-<!-- 電腦版翻頁書 -->
 <div id="book-wrapper">
     <div id="click-prev" class="click-layer"></div>
     <div id="click-next" class="click-layer"></div>
     <div id="my-album"></div>
 </div>
 
-<!-- 手機版 -->
-<div id="mobile-view">
-    <div id="mobile-album"></div>
-</div>
-<div id="mobile-counter"></div>
-
 <script>
-    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
     let currentCategory = 'A';
     let flipBook = null;
-    let mobileBook = null;
-    let mobileImages = [];
-    let mobileIndex = 0;
     let imgWidth = 85;
     let isDragging = false;
     let lastPageIndex = 0;
@@ -174,70 +94,16 @@
     const largeImg = document.getElementById('large-img');
     const bookWrapper = document.getElementById('book-wrapper');
     const loadingMsg = document.getElementById('loading-msg');
-    const mobileCounter = document.getElementById('mobile-counter');
 
-    // ── 手機版 PageFlip（只用右頁）─────────────────
-    function initMobileBook(startPage) {
-        const album = document.getElementById('mobile-album');
-        if (!album || album.children.length === 0) return;
-        if (typeof St === 'undefined') return;
-
-        if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
-
-        // 半寬：讓 PageFlip 把每頁當成全螢幕右頁
-        const w = Math.floor(window.innerWidth / 2);
-        const h = window.innerHeight - 46;
-
-        mobileBook = new St.PageFlip(album, {
-            width: w,
-            height: h,
-            size: "fixed",
-            showCover: false,
-            usePortrait: false,
-            drawShadow: true,
-            clickEventForward: false,
-            useMouseEvents: true,
-            swipeDistance: 20,
-            flippingTime: 600,
-            startPage: startPage || 0,
-        });
-
-        mobileBook.loadFromHTML(album.querySelectorAll('.page'));
-
-        mobileBook.on('flip', (e) => {
-            mobileIndex = e.data;
-            // 換算回真實圖片張數（跳過空白頁）
-            const realIndex = Math.floor(mobileIndex / 2);
-            const total = mobileImages.length;
-            mobileCounter.textContent = `${Math.min(realIndex + 1, total)} / ${total}`;
-        });
-
-        mobileCounter.style.display = 'block';
-        mobileCounter.textContent = `1 / ${mobileImages.length}`;
-    }
-
-    // ── 圖片偵測與載入 ─────────────────────────────
+    // 自動偵測圖片是否存在，邊載入邊更新翻頁書
     async function buildPages(category) {
+        const album = document.getElementById('my-album');
+        if (!album) return;
+        album.innerHTML = '';
         loadingMsg.style.display = 'block';
 
-        if (isMobile) {
-            const mv = document.getElementById('mobile-view');
-            const oldAlbum = document.getElementById('mobile-album');
-            if (oldAlbum) mv.removeChild(oldAlbum);
-            const newAlbum = document.createElement('div');
-            newAlbum.id = 'mobile-album';
-            mv.appendChild(newAlbum);
-            mobileImages = [];
-            mobileIndex = 0;
-            mobileCounter.style.display = 'none';
-        } else {
-            const album = document.getElementById('my-album');
-            if (album) album.innerHTML = '';
-        }
-
         let i = 1;
-        let desktopInitialized = false;
-        let mobileInitialized = false;
+        let initialized = false;
 
         while (true) {
             const num = String(i).padStart(2, '0');
@@ -250,49 +116,19 @@
 
             if (!exists) break;
 
-            if (isMobile) {
-                mobileImages.push(full);
-                const album = document.getElementById('mobile-album');
-                if (album) {
-                    // 奇數張前插入空白頁（左頁佔位）
-                    if (mobileImages.length === 1) {
-                        const blank = document.createElement('div');
-                        blank.className = 'page blank';
-                        album.appendChild(blank);
-                    }
-                    const page = document.createElement('div');
-                    page.className = 'page';
-                    const img = document.createElement('img');
-                    img.src = full;
-                    page.appendChild(img);
-                    album.appendChild(page);
-                }
+            const page = document.createElement('div');
+            page.className = 'page';
+            page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
+            album.appendChild(page);
 
-                if (!mobileInitialized) {
-                    loadingMsg.style.display = 'none';
-                    // 等第一頁真的在 DOM 裡才初始化
-                    setTimeout(() => initMobileBook(1), 100);
-                    mobileInitialized = true;
-                } else if (mobileBook) {
-                    mobileBook.updateFromHtml(document.querySelectorAll('#mobile-album .page'));
-                    mobileCounter.textContent = `${Math.min(mobileIndex + 1, mobileImages.length)} / ${mobileImages.length}`;
-                }
-
-            } else {
-                const album = document.getElementById('my-album');
-                if (!album) break;
-                const page = document.createElement('div');
-                page.className = 'page';
-                page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
-                album.appendChild(page);
-
-                if (!desktopInitialized) {
-                    loadingMsg.style.display = 'none';
-                    initFlipBook(0);
-                    desktopInitialized = true;
-                } else if (flipBook) {
-                    flipBook.updateFromHtml(document.querySelectorAll('#my-album .page'));
-                }
+            // 第一張載入完就先初始化翻頁書，讓使用者可以開始翻頁
+            if (!initialized) {
+                loadingMsg.style.display = 'none';
+                initFlipBook(0);
+                initialized = true;
+            } else if (flipBook) {
+                // 後續每張載入完就更新翻頁書
+                flipBook.updateFromHtml(document.querySelectorAll('.page'));
             }
 
             i++;
@@ -301,42 +137,41 @@
         loadingMsg.style.display = 'none';
     }
 
-    // ── 切換類別 ────────────────────────────────────
     async function switchCategory(category) {
         if (category === currentCategory) return;
         currentCategory = category;
 
+        // 更新 Tab 按鈕樣式
         document.querySelectorAll('#tab-bar button').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        if (isMobile) {
-            if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
-        } else {
-            if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
-            const bw = document.getElementById('book-wrapper');
-            const oldAlbum = document.getElementById('my-album');
-            if (oldAlbum) bw.removeChild(oldAlbum);
-            const newAlbum = document.createElement('div');
-            newAlbum.id = 'my-album';
-            bw.appendChild(newAlbum);
-        }
+        // 先把 flipBook 停掉，但不 destroy（避免 DOM 被動到）
+        if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
+
+        // 把 #my-album 整個換掉，確保 PageFlip 拿到乾淨的 DOM
+        const bw = document.getElementById('book-wrapper');
+        const oldAlbum = document.getElementById('my-album');
+        if (oldAlbum) bw.removeChild(oldAlbum);
+        const newAlbum = document.createElement('div');
+        newAlbum.id = 'my-album';
+        bw.appendChild(newAlbum);
 
         lastPageIndex = 0;
         await buildPages(category);
     }
 
-    // ── 電腦版 PageFlip ─────────────────────────────
     function initFlipBook(startPage = 0) {
         const el = document.getElementById('my-album');
         if (typeof St !== 'undefined' && el && el.children.length > 0) {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} }
 
-            const w = Math.min(window.innerWidth, 1200);
+            const isMobile = window.innerWidth < 768;
+            const w = isMobile ? window.innerWidth : Math.min(window.innerWidth, 1200);
             const h = window.innerHeight;
 
             flipBook = new St.PageFlip(el, {
-                width: w / 2,
+                width: isMobile ? w : w / 2,
                 height: h,
                 size: "stretch",
                 minWidth: 150,
@@ -344,14 +179,14 @@
                 maxWidth: 2500,
                 maxHeight: 2500,
                 showCover: false,
-                usePortrait: false,
+                usePortrait: true,
                 drawShadow: true,
                 clickEventForward: false,
                 useMouseEvents: true,
                 swipeDistance: 30,
             });
 
-            const pages = el.querySelectorAll('.page');
+            const pages = document.querySelectorAll('.page');
             if (pages.length > 0) { flipBook.loadFromHTML(pages); }
 
             setTimeout(() => {
@@ -361,7 +196,6 @@
     }
 
     window.addEventListener('resize', () => {
-        if (isMobile) return;
         setTimeout(async () => {
             const page = flipBook ? flipBook.getCurrentPageIndex() : 0;
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
@@ -379,19 +213,17 @@
     window.onload = async () => {
         await buildPages(currentCategory);
 
-        if (!isMobile) {
-            const prevBtn = document.getElementById('click-prev');
-            const nextBtn = document.getElementById('click-next');
-            if (prevBtn) prevBtn.onclick = () => { if (flipBook) flipBook.flipPrev(); };
-            if (nextBtn) nextBtn.onclick = () => { if (flipBook) flipBook.flipNext(); };
-            if (container) {
-                container.onclick = (e) => { if (e.target === container) closeLarge(e); };
-            }
+        const prevBtn = document.getElementById('click-prev');
+        const nextBtn = document.getElementById('click-next');
+        if (prevBtn) prevBtn.onclick = () => { if (flipBook) flipBook.flipPrev(); };
+        if (nextBtn) nextBtn.onclick = () => { if (flipBook) flipBook.flipNext(); };
+
+        if (container) {
+            container.onclick = (e) => { if (e.target === container) closeLarge(e); };
         }
     };
 
-    // 電腦版大圖
-    if (!isMobile && container) {
+    if (container) {
         container.onmousedown = (e) => {
             if (e.target === container) { closeLarge(e); return; }
             isDragging = true;
@@ -400,6 +232,9 @@
             scrollLeft = overlay.scrollLeft;
             scrollTop = overlay.scrollTop;
         };
+    }
+
+    if (largeImg) {
         largeImg.onmousedown = (e) => {
             e.preventDefault();
             isDragging = true;
@@ -408,22 +243,9 @@
             scrollLeft = overlay.scrollLeft;
             scrollTop = overlay.scrollTop;
         };
-        overlay.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            if (e.deltaY < 0) imgWidth = Math.min(500, imgWidth + 10);
-            else imgWidth = Math.max(20, imgWidth - 10);
-            largeImg.style.width = imgWidth + '%';
-        }, { passive: false });
-        window.onmousemove = (e) => {
-            if (!isDragging) return;
-            overlay.scrollLeft = scrollLeft - (e.pageX - overlay.offsetLeft - startX);
-            overlay.scrollTop = scrollTop - (e.pageY - overlay.offsetTop - startY);
-        };
-        window.onmouseup = () => isDragging = false;
     }
 
     function viewLarge(src, event) {
-        if (isMobile) return;
         if (event) { event.stopPropagation(); event.preventDefault(); }
         if (flipBook) lastPageIndex = flipBook.getCurrentPageIndex();
         bookWrapper.style.visibility = 'hidden';
@@ -444,6 +266,45 @@
             if (flipBook) flipBook.turnToPage(lastPageIndex);
         }, 50);
     }
+
+    overlay.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.deltaY < 0) imgWidth = Math.min(500, imgWidth + 10);
+        else imgWidth = Math.max(20, imgWidth - 10);
+        largeImg.style.width = imgWidth + '%';
+    }, { passive: false });
+
+    window.onmousemove = (e) => {
+        if (!isDragging) return;
+        overlay.scrollLeft = scrollLeft - (e.pageX - overlay.offsetLeft - startX);
+        overlay.scrollTop = scrollTop - (e.pageY - overlay.offsetTop - startY);
+    };
+
+    window.onmouseup = () => isDragging = false;
+
+    // 單指翻頁，雙指縮放分離處理
+    let isPinching = false;
+
+    document.addEventListener('touchstart', (e) => {
+        if (e.touches.length >= 2) {
+            isPinching = true;
+            // 雙指時停止 PageFlip 的觸控
+            if (flipBook) flipBook.getPageFlip().stopDrag();
+        } else {
+            isPinching = false;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (isPinching) {
+            // 雙指時讓瀏覽器原生縮放接管，不阻止事件
+            return;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) isPinching = false;
+    }, { passive: true });
 </script>
 </body>
 </html>
