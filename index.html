@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EDM</title>
     <meta name="author" content="Donny Chen" />
     <script src="https://maybetimetoquit-tech.github.io/YFC-EDM/css_js/page-flip.browser.min.js"></script>
@@ -44,11 +44,50 @@
             color: #888;
             font-family: sans-serif;
             z-index: 998;
+            display: none;
         }
+
+        /* 電腦版大圖 overlay */
+        #image-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.98); z-index: 1000000; overflow: auto;
+        }
+        #image-container {
+            display: block; text-align: center; width: 100%; padding: 100px 0;
+            min-height: 100vh; cursor: grab;
+        }
+        #large-img {
+            width: 85%; height: auto; display: inline-block;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.15);
+            transition: width 0.05s linear;
+        }
+        .overlay-hint {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            z-index: 2000000;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* 手機版：隱藏電腦版大圖功能 */
         @media (max-width: 767.98px) {
+            body { background: #fff; }
+            #book-wrapper {
+                margin-top: 46px;
+                height: calc(100vh - 46px) !important;
+                width: 100vw !important;
+            }
             #tab-bar { gap: 4px; padding: 6px 6px; }
             #tab-bar button { padding: 5px 10px; font-size: 12px; }
-            #book-wrapper { margin-top: 46px; }
+            #image-overlay, .overlay-hint { display: none !important; }
+            .page img { cursor: default; }
         }
     </style>
 </head>
@@ -81,6 +120,8 @@
 </div>
 
 <script>
+    const isMobile = window.innerWidth < 768;
+
     let currentCategory = 'A';
     let flipBook = null;
     let imgWidth = 85;
@@ -95,7 +136,17 @@
     const bookWrapper = document.getElementById('book-wrapper');
     const loadingMsg = document.getElementById('loading-msg');
 
-    // 自動偵測圖片是否存在，邊載入邊更新翻頁書
+    // 依裝置決定圖片點擊行為
+    function makePageHTML(thumb, full) {
+        if (isMobile) {
+            // 手機：直接用大圖，不需要點擊放大
+            return `<div class="page"><img loading="lazy" src="${full}"></div>`;
+        } else {
+            // 電腦：用縮圖，點擊開大圖
+            return `<div class="page"><img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)"></div>`;
+        }
+    }
+
     async function buildPages(category) {
         const album = document.getElementById('my-album');
         if (!album) return;
@@ -118,16 +169,18 @@
 
             const page = document.createElement('div');
             page.className = 'page';
-            page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
+            if (isMobile) {
+                page.innerHTML = `<img loading="lazy" src="${full}">`;
+            } else {
+                page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
+            }
             album.appendChild(page);
 
-            // 第一張載入完就先初始化翻頁書，讓使用者可以開始翻頁
             if (!initialized) {
                 loadingMsg.style.display = 'none';
                 initFlipBook(0);
                 initialized = true;
             } else if (flipBook) {
-                // 後續每張載入完就更新翻頁書
                 flipBook.updateFromHtml(document.querySelectorAll('.page'));
             }
 
@@ -141,15 +194,11 @@
         if (category === currentCategory) return;
         currentCategory = category;
 
-        // 更新 Tab 按鈕樣式
         document.querySelectorAll('#tab-bar button').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        // 先把 flipBook 停掉，但不 destroy（避免 DOM 被動到）
         if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
-
-        // 把 #my-album 整個換掉，確保 PageFlip 拿到乾淨的 DOM
         const bw = document.getElementById('book-wrapper');
         const oldAlbum = document.getElementById('my-album');
         if (oldAlbum) bw.removeChild(oldAlbum);
@@ -166,9 +215,8 @@
         if (typeof St !== 'undefined' && el && el.children.length > 0) {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} }
 
-            const isMobile = window.innerWidth < 768;
             const w = isMobile ? window.innerWidth : Math.min(window.innerWidth, 1200);
-            const h = window.innerHeight;
+            const h = isMobile ? window.innerHeight - 46 : window.innerHeight;
 
             flipBook = new St.PageFlip(el, {
                 width: isMobile ? w : w / 2,
@@ -180,10 +228,10 @@
                 maxHeight: 2500,
                 showCover: false,
                 usePortrait: true,
-                drawShadow: true,
+                drawShadow: !isMobile,
                 clickEventForward: false,
-                useMouseEvents: true,
-                swipeDistance: 30,
+                useMouseEvents: !isMobile, // 手機用觸控，電腦用滑鼠
+                swipeDistance: isMobile ? 20 : 30,
             });
 
             const pages = document.querySelectorAll('.page');
@@ -218,34 +266,50 @@
         if (prevBtn) prevBtn.onclick = () => { if (flipBook) flipBook.flipPrev(); };
         if (nextBtn) nextBtn.onclick = () => { if (flipBook) flipBook.flipNext(); };
 
-        if (container) {
+        if (!isMobile && container) {
             container.onclick = (e) => { if (e.target === container) closeLarge(e); };
         }
     };
 
-    if (container) {
-        container.onmousedown = (e) => {
-            if (e.target === container) { closeLarge(e); return; }
-            isDragging = true;
-            startX = e.pageX - overlay.offsetLeft;
-            startY = e.pageY - overlay.offsetTop;
-            scrollLeft = overlay.scrollLeft;
-            scrollTop = overlay.scrollTop;
-        };
-    }
-
-    if (largeImg) {
-        largeImg.onmousedown = (e) => {
+    // 電腦版大圖功能
+    if (!isMobile) {
+        if (container) {
+            container.onmousedown = (e) => {
+                if (e.target === container) { closeLarge(e); return; }
+                isDragging = true;
+                startX = e.pageX - overlay.offsetLeft;
+                startY = e.pageY - overlay.offsetTop;
+                scrollLeft = overlay.scrollLeft;
+                scrollTop = overlay.scrollTop;
+            };
+        }
+        if (largeImg) {
+            largeImg.onmousedown = (e) => {
+                e.preventDefault();
+                isDragging = true;
+                startX = e.pageX - overlay.offsetLeft;
+                startY = e.pageY - overlay.offsetTop;
+                scrollLeft = overlay.scrollLeft;
+                scrollTop = overlay.scrollTop;
+            };
+        }
+        overlay.addEventListener('wheel', (e) => {
             e.preventDefault();
-            isDragging = true;
-            startX = e.pageX - overlay.offsetLeft;
-            startY = e.pageY - overlay.offsetTop;
-            scrollLeft = overlay.scrollLeft;
-            scrollTop = overlay.scrollTop;
+            if (e.deltaY < 0) imgWidth = Math.min(500, imgWidth + 10);
+            else imgWidth = Math.max(20, imgWidth - 10);
+            largeImg.style.width = imgWidth + '%';
+        }, { passive: false });
+
+        window.onmousemove = (e) => {
+            if (!isDragging) return;
+            overlay.scrollLeft = scrollLeft - (e.pageX - overlay.offsetLeft - startX);
+            overlay.scrollTop = scrollTop - (e.pageY - overlay.offsetTop - startY);
         };
+        window.onmouseup = () => isDragging = false;
     }
 
     function viewLarge(src, event) {
+        if (isMobile) return;
         if (event) { event.stopPropagation(); event.preventDefault(); }
         if (flipBook) lastPageIndex = flipBook.getCurrentPageIndex();
         bookWrapper.style.visibility = 'hidden';
@@ -266,45 +330,6 @@
             if (flipBook) flipBook.turnToPage(lastPageIndex);
         }, 50);
     }
-
-    overlay.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        if (e.deltaY < 0) imgWidth = Math.min(500, imgWidth + 10);
-        else imgWidth = Math.max(20, imgWidth - 10);
-        largeImg.style.width = imgWidth + '%';
-    }, { passive: false });
-
-    window.onmousemove = (e) => {
-        if (!isDragging) return;
-        overlay.scrollLeft = scrollLeft - (e.pageX - overlay.offsetLeft - startX);
-        overlay.scrollTop = scrollTop - (e.pageY - overlay.offsetTop - startY);
-    };
-
-    window.onmouseup = () => isDragging = false;
-
-    // 單指翻頁，雙指縮放分離處理
-    let isPinching = false;
-
-    document.addEventListener('touchstart', (e) => {
-        if (e.touches.length >= 2) {
-            isPinching = true;
-            // 雙指時停止 PageFlip 的觸控
-            if (flipBook) flipBook.getPageFlip().stopDrag();
-        } else {
-            isPinching = false;
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-        if (isPinching) {
-            // 雙指時讓瀏覽器原生縮放接管，不阻止事件
-            return;
-        }
-    }, { passive: true });
-
-    document.addEventListener('touchend', (e) => {
-        if (e.touches.length === 0) isPinching = false;
-    }, { passive: true });
 </script>
 </body>
 </html>
