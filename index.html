@@ -107,12 +107,9 @@
             const thumb = `images/thumbs/${category}/${category}${num}.jpg?v=1`;
             const full  = `images/${category}/${category}${num}.jpg?v=1`;
 
-            const exists = await new Promise(resolve => {
-                const img = new Image();
-                img.onload = () => resolve(true);
-                img.onerror = () => resolve(false);
-                img.src = thumb;
-            });
+            const exists = await fetch(thumb, { method: 'HEAD' })
+                .then(res => res.ok)
+                .catch(() => false);
 
             if (!exists) break;
 
