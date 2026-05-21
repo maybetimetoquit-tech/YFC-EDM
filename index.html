@@ -100,21 +100,22 @@
             pointer-events: none;
             user-select: none;
         }
+        /* 翻書動畫：從右側翻過去 */
         @keyframes flipNext {
-            0%   { transform: rotateY(0deg); opacity: 1; }
-            100% { transform: rotateY(-90deg); opacity: 0; }
+            0%   { transform: rotateY(0deg); transform-origin: left center; }
+            100% { transform: rotateY(-180deg); transform-origin: left center; }
         }
         @keyframes flipNextIn {
-            0%   { transform: rotateY(90deg); opacity: 0; }
-            100% { transform: rotateY(0deg); opacity: 1; }
+            0%   { transform: rotateY(180deg); transform-origin: left center; }
+            100% { transform: rotateY(0deg); transform-origin: left center; }
         }
         @keyframes flipPrev {
-            0%   { transform: rotateY(0deg); opacity: 1; }
-            100% { transform: rotateY(90deg); opacity: 0; }
+            0%   { transform: rotateY(0deg); transform-origin: right center; }
+            100% { transform: rotateY(180deg); transform-origin: right center; }
         }
         @keyframes flipPrevIn {
-            0%   { transform: rotateY(-90deg); opacity: 0; }
-            100% { transform: rotateY(0deg); opacity: 1; }
+            0%   { transform: rotateY(-180deg); transform-origin: right center; }
+            100% { transform: rotateY(0deg); transform-origin: right center; }
         }
         #mobile-counter {
             position: fixed;
@@ -217,13 +218,14 @@
         img.src = mobileImages[newIndex];
         next.appendChild(img);
 
+        const dur = 400;
         if (direction === 'next') {
-            current.style.animation = 'flipNext 0.25s ease forwards';
-            next.style.animation = 'flipNextIn 0.25s ease 0.2s forwards';
+            current.style.animation = `flipNext ${dur}ms cubic-bezier(0.4,0,0.2,1) forwards`;
+            next.style.animation = `flipNextIn ${dur}ms cubic-bezier(0.4,0,0.2,1) ${dur * 0.6}ms forwards`;
             next.style.opacity = '0';
         } else {
-            current.style.animation = 'flipPrev 0.25s ease forwards';
-            next.style.animation = 'flipPrevIn 0.25s ease 0.2s forwards';
+            current.style.animation = `flipPrev ${dur}ms cubic-bezier(0.4,0,0.2,1) forwards`;
+            next.style.animation = `flipPrevIn ${dur}ms cubic-bezier(0.4,0,0.2,1) ${dur * 0.6}ms forwards`;
             next.style.opacity = '0';
         }
 
@@ -234,7 +236,7 @@
             mobileIndex = newIndex;
             mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
             isFlipping = false;
-        }, 450);
+        }, dur * 1.8);
     }
 
     // 觸控滑動
