@@ -74,48 +74,30 @@
             pointer-events: none;
         }
 
-        /* 手機版 */
+        /* 手機版 PageFlip - 只用右頁 */
         #mobile-view {
             display: none;
             position: fixed;
             top: 46px; left: 0;
             width: 100vw;
             height: calc(100vh - 46px);
+            background: #fff;
             overflow: hidden;
-            background: #fff;
-            perspective: 1500px;
         }
-        .m-slide {
-            position: absolute;
-            top: 0; left: 0;
+        #mobile-album { width: 100%; height: 100%; }
+        #mobile-album .page {
+            background: #fff !important;
+            overflow: hidden;
+        }
+        #mobile-album .page img {
             width: 100%; height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #fff;
-        }
-        .m-slide img {
-            max-width: 100%; max-height: 100%;
             object-fit: contain;
             pointer-events: none;
             user-select: none;
         }
-        /* 翻書動畫：從右側翻過去 */
-        @keyframes flipNext {
-            0%   { transform: rotateY(0deg); transform-origin: left center; }
-            100% { transform: rotateY(-180deg); transform-origin: left center; }
-        }
-        @keyframes flipNextIn {
-            0%   { transform: rotateY(180deg); transform-origin: left center; }
-            100% { transform: rotateY(0deg); transform-origin: left center; }
-        }
-        @keyframes flipPrev {
-            0%   { transform: rotateY(0deg); transform-origin: right center; }
-            100% { transform: rotateY(180deg); transform-origin: right center; }
-        }
-        @keyframes flipPrevIn {
-            0%   { transform: rotateY(-180deg); transform-origin: right center; }
-            100% { transform: rotateY(0deg); transform-origin: right center; }
+        /* 左頁空白頁不需要顯示內容 */
+        #mobile-album .page.blank {
+            background: #fff !important;
         }
         #mobile-counter {
             position: fixed;
@@ -160,13 +142,17 @@
     </div>
 </div>
 
+<!-- 電腦版翻頁書 -->
 <div id="book-wrapper">
     <div id="click-prev" class="click-layer"></div>
     <div id="click-next" class="click-layer"></div>
     <div id="my-album"></div>
 </div>
 
-<div id="mobile-view"></div>
+<!-- 手機版 -->
+<div id="mobile-view">
+    <div id="mobile-album"></div>
+</div>
 <div id="mobile-counter"></div>
 
 <script>
@@ -190,74 +176,51 @@
     const loadingMsg = document.getElementById('loading-msg');
     const mobileCounter = document.getElementById('mobile-counter');
 
-    // ── 手機版 flip swiper ─────────────────────────
-    let isFlipping = false;
+    // ── 手機版 PageFlip（只用右頁）─────────────────
+    function initMobileBook(startPage) {
+        const album = document.getElementById('mobile-album');
+        if (!album || album.children.length === 0) return;
+        if (typeof St === 'undefined') return;
 
-    function mobileShowSlide(src) {
-        const view = document.getElementById('mobile-view');
-        view.innerHTML = '';
-        const slide = document.createElement('div');
-        slide.className = 'm-slide';
-        const img = document.createElement('img');
-        img.src = src;
-        slide.appendChild(img);
-        view.appendChild(slide);
+        if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
+
+        // 半寬：讓 PageFlip 把每頁當成全螢幕右頁
+        const w = Math.floor(window.innerWidth / 2);
+        const h = window.innerHeight - 46;
+
+        mobileBook = new St.PageFlip(album, {
+            width: w,
+            height: h,
+            size: "fixed",
+            showCover: false,
+            usePortrait: false,
+            drawShadow: true,
+            clickEventForward: false,
+            useMouseEvents: true,
+            swipeDistance: 20,
+            flippingTime: 600,
+            startPage: startPage || 0,
+        });
+
+        mobileBook.loadFromHTML(album.querySelectorAll('.page'));
+
+        mobileBook.on('flip', (e) => {
+            mobileIndex = e.data;
+            // 換算回真實圖片張數（跳過空白頁）
+            const realIndex = Math.floor(mobileIndex / 2);
+            const total = mobileImages.length;
+            mobileCounter.textContent = `${Math.min(realIndex + 1, total)} / ${total}`;
+        });
+
+        mobileCounter.style.display = 'block';
+        mobileCounter.textContent = `1 / ${mobileImages.length}`;
     }
-
-    function mobileFlipTo(newIndex, direction) {
-        if (isFlipping) return;
-        if (newIndex < 0 || newIndex >= mobileImages.length) return;
-        isFlipping = true;
-
-        const view = document.getElementById('mobile-view');
-        const current = view.querySelector('.m-slide');
-
-        const next = document.createElement('div');
-        next.className = 'm-slide';
-        const img = document.createElement('img');
-        img.src = mobileImages[newIndex];
-        next.appendChild(img);
-
-        const dur = 400;
-        if (direction === 'next') {
-            current.style.animation = `flipNext ${dur}ms cubic-bezier(0.4,0,0.2,1) forwards`;
-            next.style.animation = `flipNextIn ${dur}ms cubic-bezier(0.4,0,0.2,1) ${dur * 0.6}ms forwards`;
-            next.style.opacity = '0';
-        } else {
-            current.style.animation = `flipPrev ${dur}ms cubic-bezier(0.4,0,0.2,1) forwards`;
-            next.style.animation = `flipPrevIn ${dur}ms cubic-bezier(0.4,0,0.2,1) ${dur * 0.6}ms forwards`;
-            next.style.opacity = '0';
-        }
-
-        view.appendChild(next);
-
-        setTimeout(() => {
-            if (current) current.remove();
-            mobileIndex = newIndex;
-            mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
-            isFlipping = false;
-        }, dur * 1.8);
-    }
-
-    // 觸控滑動
-    let touchStartX = 0;
-    document.getElementById('mobile-view').addEventListener('touchstart', e => {
-        touchStartX = e.touches[0].clientX;
-    }, { passive: true });
-    document.getElementById('mobile-view').addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        if (Math.abs(dx) > 40) {
-            if (dx < 0) mobileFlipTo(mobileIndex + 1, 'next');
-            else mobileFlipTo(mobileIndex - 1, 'prev');
-        }
-    }, { passive: true });
 
     // ── 圖片偵測與載入 ─────────────────────────────
     async function buildPages(category) {
         loadingMsg.style.display = 'block';
 
         if (isMobile) {
-            // 重建 mobile-album
             const mv = document.getElementById('mobile-view');
             const oldAlbum = document.getElementById('mobile-album');
             if (oldAlbum) mv.removeChild(oldAlbum);
@@ -266,6 +229,7 @@
             mv.appendChild(newAlbum);
             mobileImages = [];
             mobileIndex = 0;
+            mobileCounter.style.display = 'none';
         } else {
             const album = document.getElementById('my-album');
             if (album) album.innerHTML = '';
@@ -273,6 +237,7 @@
 
         let i = 1;
         let desktopInitialized = false;
+        let mobileInitialized = false;
 
         while (true) {
             const num = String(i).padStart(2, '0');
@@ -287,12 +252,32 @@
 
             if (isMobile) {
                 mobileImages.push(full);
-                if (i === 1) {
-                    loadingMsg.style.display = 'none';
-                    mobileShowSlide(full);
-                    mobileCounter.style.display = 'block';
+                const album = document.getElementById('mobile-album');
+                if (album) {
+                    // 奇數張前插入空白頁（左頁佔位）
+                    if (mobileImages.length === 1) {
+                        const blank = document.createElement('div');
+                        blank.className = 'page blank';
+                        album.appendChild(blank);
+                    }
+                    const page = document.createElement('div');
+                    page.className = 'page';
+                    const img = document.createElement('img');
+                    img.src = full;
+                    page.appendChild(img);
+                    album.appendChild(page);
                 }
-                mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
+
+                if (!mobileInitialized) {
+                    loadingMsg.style.display = 'none';
+                    // 等第一頁真的在 DOM 裡才初始化
+                    setTimeout(() => initMobileBook(1), 100);
+                    mobileInitialized = true;
+                } else if (mobileBook) {
+                    mobileBook.updateFromHtml(document.querySelectorAll('#mobile-album .page'));
+                    mobileCounter.textContent = `${Math.min(mobileIndex + 1, mobileImages.length)} / ${mobileImages.length}`;
+                }
+
             } else {
                 const album = document.getElementById('my-album');
                 if (!album) break;
@@ -314,10 +299,6 @@
         }
 
         loadingMsg.style.display = 'none';
-
-        if (isMobile) {
-            mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
-        }
     }
 
     // ── 切換類別 ────────────────────────────────────
@@ -330,11 +311,7 @@
         });
 
         if (isMobile) {
-            mobileImages = [];
-            mobileIndex = 0;
-            isFlipping = false;
-            document.getElementById('mobile-view').innerHTML = '';
-            mobileCounter.style.display = 'none';
+            if (mobileBook) { try { mobileBook.destroy(); } catch(e) {} mobileBook = null; }
         } else {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
             const bw = document.getElementById('book-wrapper');
@@ -413,7 +390,7 @@
         }
     };
 
-    // ── 電腦版大圖 ──────────────────────────────────
+    // 電腦版大圖
     if (!isMobile && container) {
         container.onmousedown = (e) => {
             if (e.target === container) { closeLarge(e); return; }
