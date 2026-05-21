@@ -34,9 +34,6 @@
             color: #fff;
             border-color: #333;
         }
-        #book-wrapper {
-            margin-top: 50px;
-        }
         #loading-msg {
             position: fixed;
             top: 55px; left: 12px;
@@ -47,7 +44,8 @@
             display: none;
         }
 
-        /* 電腦版大圖 overlay */
+        /* 電腦版 */
+        #book-wrapper { margin-top: 50px; }
         #image-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255,255,255,0.98); z-index: 1000000; overflow: auto;
@@ -76,18 +74,56 @@
             pointer-events: none;
         }
 
-        /* 手機版：隱藏電腦版大圖功能 */
+        /* 手機版 swiper */
+        #mobile-view {
+            display: none;
+            position: fixed;
+            top: 46px; left: 0;
+            width: 100vw;
+            height: calc(100vh - 46px);
+            overflow: hidden;
+            background: #fff;
+        }
+        #mobile-strip {
+            display: flex;
+            height: 100%;
+            transition: transform 0.3s ease;
+            will-change: transform;
+        }
+        #mobile-strip .m-page {
+            min-width: 100vw;
+            width: 100vw;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+        }
+        #mobile-strip .m-page img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+        #mobile-counter {
+            position: fixed;
+            bottom: 12px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.45);
+            color: #fff;
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            z-index: 1000;
+            font-family: sans-serif;
+        }
+
         @media (max-width: 767.98px) {
-            body { background: #fff; }
-            #book-wrapper {
-                margin-top: 46px;
-                height: calc(100vh - 46px) !important;
-                width: 100vw !important;
-            }
+            #book-wrapper, #image-overlay, .overlay-hint { display: none !important; }
+            #mobile-view { display: block; }
             #tab-bar { gap: 4px; padding: 6px 6px; }
             #tab-bar button { padding: 5px 10px; font-size: 12px; }
-            #image-overlay, .overlay-hint { display: none !important; }
-            .page img { cursor: default; }
         }
     </style>
 </head>
@@ -103,21 +139,28 @@
 
 <div id="loading-msg">Loading...</div>
 
+<!-- 電腦版大圖 overlay -->
 <div class="overlay-hint" id="overlay-hint">
     <span>滑鼠滾輪：縮放照片 │ 按住左鍵：拖拽移動 │ 點擊空白處：關閉</span>
 </div>
-
 <div id="image-overlay">
     <div id="image-container">
         <img id="large-img" src="">
     </div>
 </div>
 
+<!-- 電腦版翻頁書 -->
 <div id="book-wrapper">
     <div id="click-prev" class="click-layer"></div>
     <div id="click-next" class="click-layer"></div>
     <div id="my-album"></div>
 </div>
+
+<!-- 手機版 swiper -->
+<div id="mobile-view">
+    <div id="mobile-strip"></div>
+</div>
+<div id="mobile-counter" style="display:none"></div>
 
 <script>
     const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -136,25 +179,61 @@
     const bookWrapper = document.getElementById('book-wrapper');
     const loadingMsg = document.getElementById('loading-msg');
 
-    // 依裝置決定圖片點擊行為
-    function makePageHTML(thumb, full) {
-        if (isMobile) {
-            // 手機：直接用大圖，不需要點擊放大
-            return `<div class="page"><img loading="lazy" src="${full}"></div>`;
-        } else {
-            // 電腦：用縮圖，點擊開大圖
-            return `<div class="page"><img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)"></div>`;
-        }
+    // ── 手機版 swiper ──────────────────────────────
+    let mobileImages = [];
+    let mobileIndex = 0;
+    const mobileView = document.getElementById('mobile-view');
+    const mobileStrip = document.getElementById('mobile-strip');
+    const mobileCounter = document.getElementById('mobile-counter');
+
+    function mobileRender() {
+        mobileStrip.style.transition = 'none';
+        mobileStrip.innerHTML = '';
+        mobileImages.forEach(src => {
+            const div = document.createElement('div');
+            div.className = 'm-page';
+            const img = document.createElement('img');
+            img.src = src;
+            div.appendChild(img);
+            mobileStrip.appendChild(div);
+        });
+        mobileGoTo(mobileIndex, false);
+        mobileCounter.style.display = mobileImages.length ? 'block' : 'none';
     }
 
+    function mobileGoTo(index, animate = true) {
+        mobileIndex = Math.max(0, Math.min(index, mobileImages.length - 1));
+        mobileStrip.style.transition = animate ? 'transform 0.3s ease' : 'none';
+        mobileStrip.style.transform = `translateX(-${mobileIndex * 100}vw)`;
+        mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
+    }
+
+    // 觸控滑動
+    let touchStartX = 0;
+    mobileView.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    mobileView.addEventListener('touchend', e => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        if (Math.abs(dx) > 40) {
+            if (dx < 0) mobileGoTo(mobileIndex + 1);
+            else mobileGoTo(mobileIndex - 1);
+        }
+    }, { passive: true });
+
+    // ── 共用：圖片偵測與載入 ───────────────────────
     async function buildPages(category) {
-        const album = document.getElementById('my-album');
-        if (!album) return;
-        album.innerHTML = '';
         loadingMsg.style.display = 'block';
 
+        if (isMobile) {
+            mobileImages = [];
+            mobileIndex = 0;
+            mobileStrip.innerHTML = '';
+        } else {
+            const album = document.getElementById('my-album');
+            if (album) album.innerHTML = '';
+        }
+
         let i = 1;
-        let initialized = false;
+        let desktopInitialized = false;
 
         while (true) {
             const num = String(i).padStart(2, '0');
@@ -167,21 +246,37 @@
 
             if (!exists) break;
 
-            const page = document.createElement('div');
-            page.className = 'page';
             if (isMobile) {
-                page.innerHTML = `<img loading="lazy" src="${full}">`;
+                mobileImages.push(full);
+                // 第一張載入就顯示
+                if (i === 1) {
+                    loadingMsg.style.display = 'none';
+                    mobileRender();
+                } else {
+                    // 新增一頁到 strip
+                    const div = document.createElement('div');
+                    div.className = 'm-page';
+                    const img = document.createElement('img');
+                    img.src = full;
+                    div.appendChild(img);
+                    mobileStrip.appendChild(div);
+                    mobileCounter.textContent = `${mobileIndex + 1} / ${mobileImages.length}`;
+                }
             } else {
+                const album = document.getElementById('my-album');
+                if (!album) break;
+                const page = document.createElement('div');
+                page.className = 'page';
                 page.innerHTML = `<img loading="lazy" src="${thumb}" onClick="viewLarge('${full}', event)">`;
-            }
-            album.appendChild(page);
+                album.appendChild(page);
 
-            if (!initialized) {
-                loadingMsg.style.display = 'none';
-                initFlipBook(0);
-                initialized = true;
-            } else if (flipBook) {
-                flipBook.updateFromHtml(document.querySelectorAll('.page'));
+                if (!desktopInitialized) {
+                    loadingMsg.style.display = 'none';
+                    initFlipBook(0);
+                    desktopInitialized = true;
+                } else if (flipBook) {
+                    flipBook.updateFromHtml(document.querySelectorAll('.page'));
+                }
             }
 
             i++;
@@ -198,15 +293,18 @@
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
-        const bw = document.getElementById('book-wrapper');
-        const oldAlbum = document.getElementById('my-album');
-        if (oldAlbum) bw.removeChild(oldAlbum);
-        const newAlbum = document.createElement('div');
-        newAlbum.id = 'my-album';
-        bw.appendChild(newAlbum);
+        if (!isMobile) {
+            if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
+            const bw = document.getElementById('book-wrapper');
+            const oldAlbum = document.getElementById('my-album');
+            if (oldAlbum) bw.removeChild(oldAlbum);
+            const newAlbum = document.createElement('div');
+            newAlbum.id = 'my-album';
+            bw.appendChild(newAlbum);
+        }
 
         lastPageIndex = 0;
+        mobileIndex = 0;
         await buildPages(category);
     }
 
@@ -215,11 +313,11 @@
         if (typeof St !== 'undefined' && el && el.children.length > 0) {
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} }
 
-            const w = isMobile ? window.innerWidth : Math.min(window.innerWidth, 1200);
-            const h = isMobile ? window.innerHeight - 46 : window.innerHeight;
+            const w = Math.min(window.innerWidth, 1200);
+            const h = window.innerHeight;
 
             flipBook = new St.PageFlip(el, {
-                width: isMobile ? w : w / 2,
+                width: w / 2,
                 height: h,
                 size: "stretch",
                 minWidth: 150,
@@ -227,11 +325,11 @@
                 maxWidth: 2500,
                 maxHeight: 2500,
                 showCover: false,
-                usePortrait: true,
-                drawShadow: !isMobile,
+                usePortrait: false,
+                drawShadow: true,
                 clickEventForward: false,
-                useMouseEvents: !isMobile, // 手機用觸控，電腦用滑鼠
-                swipeDistance: isMobile ? 20 : 30,
+                useMouseEvents: true,
+                swipeDistance: 30,
             });
 
             const pages = document.querySelectorAll('.page');
@@ -244,6 +342,7 @@
     }
 
     window.addEventListener('resize', () => {
+        if (isMobile) return; // 手機版不需要 resize 重建
         setTimeout(async () => {
             const page = flipBook ? flipBook.getCurrentPageIndex() : 0;
             if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
@@ -261,45 +360,41 @@
     window.onload = async () => {
         await buildPages(currentCategory);
 
-        const prevBtn = document.getElementById('click-prev');
-        const nextBtn = document.getElementById('click-next');
-        if (prevBtn) prevBtn.onclick = () => { if (flipBook) flipBook.flipPrev(); };
-        if (nextBtn) nextBtn.onclick = () => { if (flipBook) flipBook.flipNext(); };
-
-        if (!isMobile && container) {
-            container.onclick = (e) => { if (e.target === container) closeLarge(e); };
+        if (!isMobile) {
+            const prevBtn = document.getElementById('click-prev');
+            const nextBtn = document.getElementById('click-next');
+            if (prevBtn) prevBtn.onclick = () => { if (flipBook) flipBook.flipPrev(); };
+            if (nextBtn) nextBtn.onclick = () => { if (flipBook) flipBook.flipNext(); };
+            if (container) {
+                container.onclick = (e) => { if (e.target === container) closeLarge(e); };
+            }
         }
     };
 
     // 電腦版大圖功能
-    if (!isMobile) {
-        if (container) {
-            container.onmousedown = (e) => {
-                if (e.target === container) { closeLarge(e); return; }
-                isDragging = true;
-                startX = e.pageX - overlay.offsetLeft;
-                startY = e.pageY - overlay.offsetTop;
-                scrollLeft = overlay.scrollLeft;
-                scrollTop = overlay.scrollTop;
-            };
-        }
-        if (largeImg) {
-            largeImg.onmousedown = (e) => {
-                e.preventDefault();
-                isDragging = true;
-                startX = e.pageX - overlay.offsetLeft;
-                startY = e.pageY - overlay.offsetTop;
-                scrollLeft = overlay.scrollLeft;
-                scrollTop = overlay.scrollTop;
-            };
-        }
+    if (!isMobile && container) {
+        container.onmousedown = (e) => {
+            if (e.target === container) { closeLarge(e); return; }
+            isDragging = true;
+            startX = e.pageX - overlay.offsetLeft;
+            startY = e.pageY - overlay.offsetTop;
+            scrollLeft = overlay.scrollLeft;
+            scrollTop = overlay.scrollTop;
+        };
+        largeImg.onmousedown = (e) => {
+            e.preventDefault();
+            isDragging = true;
+            startX = e.pageX - overlay.offsetLeft;
+            startY = e.pageY - overlay.offsetTop;
+            scrollLeft = overlay.scrollLeft;
+            scrollTop = overlay.scrollTop;
+        };
         overlay.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (e.deltaY < 0) imgWidth = Math.min(500, imgWidth + 10);
             else imgWidth = Math.max(20, imgWidth - 10);
             largeImg.style.width = imgWidth + '%';
         }, { passive: false });
-
         window.onmousemove = (e) => {
             if (!isDragging) return;
             overlay.scrollLeft = scrollLeft - (e.pageX - overlay.offsetLeft - startX);
