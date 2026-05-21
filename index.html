@@ -129,8 +129,15 @@
             btn.classList.toggle('active', btn.getAttribute('onclick') === `switchCategory('${category}')`);
         });
 
-        // 銷毀舊 flipBook，重建頁面
+        // 銷毀舊 flipBook，重建 #my-album（destroy 會動到 DOM）
         if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
+        const bw = document.getElementById("book-wrapper");
+        let album = document.getElementById("my-album");
+        if (!album) {
+            album = document.createElement("div");
+            album.id = "my-album";
+            bw.appendChild(album);
+        }
         lastPageIndex = 0;
         await buildPages(category);
         initFlipBook(0);
