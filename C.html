@@ -112,7 +112,9 @@
     }
 
     window.addEventListener('resize', () => {
-        initFlipBook(flipBook ? flipBook.getCurrentPageIndex() : 0);
+        setTimeout(() => {
+            initFlipBook(flipBook ? flipBook.getCurrentPageIndex() : 0);
+        }, 300);
     });
 
     window.onload = () => {
