@@ -195,8 +195,17 @@
     }
 
     window.addEventListener('resize', () => {
-        setTimeout(() => {
-            initFlipBook(flipBook ? flipBook.getCurrentPageIndex() : 0);
+        setTimeout(async () => {
+            const page = flipBook ? flipBook.getCurrentPageIndex() : 0;
+            if (flipBook) { try { flipBook.destroy(); } catch(e) {} flipBook = null; }
+            const bw = document.getElementById('book-wrapper');
+            const oldAlbum = document.getElementById('my-album');
+            if (oldAlbum) bw.removeChild(oldAlbum);
+            const newAlbum = document.createElement('div');
+            newAlbum.id = 'my-album';
+            bw.appendChild(newAlbum);
+            await buildPages(currentCategory);
+            setTimeout(() => { if (flipBook) flipBook.turnToPage(page); }, 200);
         }, 300);
     });
 
